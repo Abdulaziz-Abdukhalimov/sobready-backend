@@ -28,6 +28,7 @@ target/
 ### Environment ###
 *.env
 *.env.local
+src/main/resources/application.properties
 
 ### Uploads ###
 src/main/resources/static/uploads/*
