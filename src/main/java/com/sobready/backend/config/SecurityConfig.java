@@ -9,6 +9,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
@@ -30,10 +31,9 @@ public class SecurityConfig {
     @Autowired
     private CorsConfigurationSource corsConfigurationSource;
 
-    /**
-     * Security filter chain — controls which endpoints need authentication.
-     * For now, we allow everything publicly. We'll add JWT auth in the Member step.
-     */
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -59,7 +59,19 @@ public class SecurityConfig {
 
                         // Everything else requires authentication
                         .anyRequest().authenticated()
-                );
+                )
+
+                /**
+                 * Add our JWT filter BEFORE Spring's default authentication filter.
+                 *
+                 * NestJS equivalent:
+                 *   app.useGlobalGuards(new JwtAuthGuard());
+                 *
+                 * This means: "For every request, first run JwtAuthenticationFilter
+                 * to check for tokens, THEN check the URL permissions above."
+                 */
+                .addFilterBefore(jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
