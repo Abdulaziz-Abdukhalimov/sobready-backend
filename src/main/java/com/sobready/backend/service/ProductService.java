@@ -3,9 +3,11 @@ package com.sobready.backend.service;
 import com.sobready.backend.dto.ProductCreateDto;
 import com.sobready.backend.dto.ProductUpdateDto;
 import com.sobready.backend.entity.Product;
+import com.sobready.backend.entity.View;
 import com.sobready.backend.enums.*;
 import com.sobready.backend.repository.ProductRepository;
 import com.sobready.backend.repository.ProductSpecification;
+import com.sobready.backend.repository.ViewRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -45,6 +47,9 @@ public class ProductService {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private ViewRepository viewRepository;
 
     /**
      * Get products with filtering, sorting, and pagination.
@@ -94,15 +99,27 @@ public class ProductService {
 
     /**
      * Get a single product by ID.
-     * Also increments the view count (your React frontend tracks product views).
+     * Only increments view count if this member hasn't viewed it before.
+     *
+     * @param memberId null if user is not logged in (still show the product, just don't track view)
      */
-    public Product getProduct(Long productId) {
+    public Product getProduct(Long productId, Long memberId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        // Increment view count
-        product.setProductView(product.getProductView() + 1);
-        return productRepository.save(product);
+        // Only count unique views from logged-in users
+        if (memberId != null && !viewRepository.existsByMemberIdAndProductId(memberId, productId)) {
+            View view = View.builder()
+                    .memberId(memberId)
+                    .productId(productId)
+                    .build();
+            viewRepository.save(view);
+
+            product.setProductView(product.getProductView() + 1);
+            product = productRepository.save(product);
+        }
+
+        return product;
     }
 
     // ===================== ADMIN ENDPOINTS =====================

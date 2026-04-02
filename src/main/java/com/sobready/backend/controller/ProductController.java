@@ -50,9 +50,18 @@ public class ProductController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * @AuthenticationPrincipal is nullable here — product page is public,
+     * but if the user is logged in we track their view.
+     * Guest users can still see the product, just no view tracking.
+     */
     @GetMapping("/{productId}")
-    public ResponseEntity<Product> getProduct(@PathVariable Long productId) {
-        Product product = productService.getProduct(productId);
+    public ResponseEntity<Product> getProduct(
+            @PathVariable Long productId,
+            @AuthenticationPrincipal Member currentMember
+    ) {
+        Long memberId = currentMember != null ? currentMember.getId() : null;
+        Product product = productService.getProduct(productId, memberId);
         return ResponseEntity.ok(product);
     }
 
