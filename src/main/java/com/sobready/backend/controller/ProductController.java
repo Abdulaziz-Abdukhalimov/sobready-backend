@@ -1,36 +1,23 @@
 package com.sobready.backend.controller;
 
+import com.sobready.backend.dto.ProductCreateDto;
+import com.sobready.backend.dto.ProductUpdateDto;
+import com.sobready.backend.entity.Member;
 import com.sobready.backend.entity.Product;
 import com.sobready.backend.enums.*;
 import com.sobready.backend.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-/**
- * NestJS equivalent:
- *
- *   @Controller('product')
- *   export class ProductController {
- *     constructor(private productService: ProductService) {}
- *
- *     @Get('all')
- *     async getProducts(@Query() query: ProductInquiry) {
- *       return this.productService.getProducts(query);
- *     }
- *   }
- *
- * @RestController = @Controller + @ResponseBody
- *   Means: "this handles HTTP requests AND returns JSON automatically"
- *   In NestJS, @Controller() returns JSON by default — same idea.
- *
- * @RequestMapping("/product") = base URL path
- *   Same as @Controller('product') in NestJS
- */
 @RestController
 @RequestMapping("/product")
 public class ProductController {
@@ -38,13 +25,8 @@ public class ProductController {
     @Autowired
     private ProductService productService;
 
-    /**
-     * GET /product/all?order=X&page=1&limit=8&productType=X&productFragrance=X&productGender=X&search=X
-     *
-     * @RequestParam = @Query() in NestJS
-     * (required = false) = optional parameter
-     * (defaultValue = "1") = default if not provided
-     */
+    // ===================== PUBLIC ENDPOINTS =====================
+
     @GetMapping("/all")
     public ResponseEntity<Map<String, Object>> getProducts(
             @RequestParam(required = false) String order,
@@ -59,7 +41,6 @@ public class ProductController {
                 order, page, limit, productType, productFragrance, productGender, search
         );
 
-        // Return format that your React frontend expects
         Map<String, Object> response = new HashMap<>();
         response.put("list", productPage.getContent());
         response.put("total", productPage.getTotalElements());
@@ -69,15 +50,74 @@ public class ProductController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * GET /product/{productId}
-     *
-     * @PathVariable = @Param('productId') in NestJS
-     * Your React calls: GET /product/${productId}
-     */
     @GetMapping("/{productId}")
     public ResponseEntity<Product> getProduct(@PathVariable Long productId) {
         Product product = productService.getProduct(productId);
         return ResponseEntity.ok(product);
+    }
+
+    // ===================== ADMIN ENDPOINTS =====================
+
+    /**
+     * POST /product/create (ADMIN only)
+     *
+     * Now uses DTO — clean, one object instead of 10 parameters.
+     *
+     * NestJS equivalent:
+     *   @Post('create')
+     *   async create(@Body() dto: CreateProductDto, @UploadedFiles() files) { ... }
+     *
+     * Since we accept both JSON fields + file uploads, we use @RequestPart:
+     *   - @RequestPart("data") = the JSON DTO
+     *   - @RequestPart("productImages") = the uploaded files
+     */
+    @PostMapping("/create")
+    public ResponseEntity<?> createProduct(
+            @AuthenticationPrincipal Member currentMember,
+            @RequestPart("data") ProductCreateDto dto,
+            @RequestPart(value = "productImages", required = false) List<MultipartFile> productImages
+    ) throws IOException {
+
+        if (currentMember.getMemberType() != MemberType.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("message", "Admin access required"));
+        }
+
+        Product product = productService.createProduct(dto, productImages);
+        return ResponseEntity.ok(product);
+    }
+
+    /**
+     * POST /product/update (ADMIN only)
+     */
+    @PostMapping("/update")
+    public ResponseEntity<?> updateProduct(
+            @AuthenticationPrincipal Member currentMember,
+            @RequestPart("data") ProductUpdateDto dto,
+            @RequestPart(value = "productImages", required = false) List<MultipartFile> productImages
+    ) throws IOException {
+
+        if (currentMember.getMemberType() != MemberType.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("message", "Admin access required"));
+        }
+
+        Product product = productService.updateProduct(dto, productImages);
+        return ResponseEntity.ok(product);
+    }
+
+    /**
+     * POST /product/delete (ADMIN only)
+     * Soft delete — sets status to INACTIVE.
+     */
+    @PostMapping("/delete")
+    public ResponseEntity<?> deleteProduct(
+            @AuthenticationPrincipal Member currentMember,
+            @RequestBody Map<String, Long> input
+    ) {
+        if (currentMember.getMemberType() != MemberType.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("message", "Admin access required"));
+        }
+
+        productService.deleteProduct(input.get("productId"));
+        return ResponseEntity.ok(Map.of("message", "Product deleted successfully"));
     }
 }

@@ -1,5 +1,7 @@
 package com.sobready.backend.service;
 
+import com.sobready.backend.dto.ProductCreateDto;
+import com.sobready.backend.dto.ProductUpdateDto;
 import com.sobready.backend.entity.Product;
 import com.sobready.backend.enums.*;
 import com.sobready.backend.repository.ProductRepository;
@@ -11,6 +13,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * NestJS equivalent:
@@ -92,5 +103,115 @@ public class ProductService {
         // Increment view count
         product.setProductView(product.getProductView() + 1);
         return productRepository.save(product);
+    }
+
+    // ===================== ADMIN ENDPOINTS =====================
+
+    private final String uploadDir = "src/main/resources/static/uploads/";
+
+    /**
+     * Create a new product (ADMIN only).
+     *
+     * NestJS equivalent:
+     *   @UseGuards(JwtAuthGuard, RolesGuard)
+     *   @Roles('ADMIN')
+     *   @Post('create')
+     *   async createProduct(@Body() dto: CreateProductDto, @UploadedFiles() files) { ... }
+     */
+    public Product createProduct(ProductCreateDto dto, List<MultipartFile> images) throws IOException {
+
+        // Build the product from DTO — clean and readable
+        Product product = Product.builder()
+                .productName(dto.getProductName())
+                .productBrand(dto.getProductBrand())
+                .productPrice(dto.getProductPrice())
+                .productStock(dto.getProductStock() != null ? dto.getProductStock() : 0)
+                .productType(dto.getProductType())
+                .productFragrance(dto.getProductFragrance())
+                .productGender(dto.getProductGender())
+                .productVolume(dto.getProductVolume())
+                .productDesc(dto.getProductDesc())
+                .build();
+
+        // Save images if provided
+        if (images != null && !images.isEmpty()) {
+            List<String> imagePaths = new ArrayList<>();
+            for (MultipartFile image : images) {
+                String path = saveImage(image);
+                imagePaths.add(path);
+            }
+            product.setProductImages(imagePaths);
+        }
+
+        return productRepository.save(product);
+    }
+
+    /**
+     * Update an existing product (ADMIN only).
+     * Only updates fields that are provided (non-null).
+     */
+    public Product updateProduct(ProductUpdateDto dto, List<MultipartFile> images) throws IOException {
+
+        Product product = productRepository.findById(dto.getProductId())
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        // Update only provided fields — like PATCH in REST
+        if (dto.getProductName() != null) product.setProductName(dto.getProductName());
+        if (dto.getProductBrand() != null) product.setProductBrand(dto.getProductBrand());
+        if (dto.getProductPrice() != null) product.setProductPrice(dto.getProductPrice());
+        if (dto.getProductStock() != null) product.setProductStock(dto.getProductStock());
+        if (dto.getProductType() != null) product.setProductType(dto.getProductType());
+        if (dto.getProductFragrance() != null) product.setProductFragrance(dto.getProductFragrance());
+        if (dto.getProductGender() != null) product.setProductGender(dto.getProductGender());
+        if (dto.getProductVolume() != null) product.setProductVolume(dto.getProductVolume());
+        if (dto.getProductDesc() != null) product.setProductDesc(dto.getProductDesc());
+        if (dto.getProductStatus() != null) product.setProductStatus(dto.getProductStatus());
+
+        // If new images are uploaded, replace old ones
+        if (images != null && !images.isEmpty()) {
+            List<String> imagePaths = new ArrayList<>();
+            for (MultipartFile image : images) {
+                String path = saveImage(image);
+                imagePaths.add(path);
+            }
+            product.setProductImages(imagePaths);
+        }
+
+        return productRepository.save(product);
+    }
+
+    /**
+     * Delete a product (ADMIN only).
+     * We don't actually delete — we set status to INACTIVE (soft delete).
+     * This preserves order history that references this product.
+     */
+    public void deleteProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        product.setProductStatus(ProductStatus.INACTIVE);
+        productRepository.save(product);
+    }
+
+    /**
+     * Save uploaded image to disk. Returns relative path like "uploads/abc123.jpg"
+     */
+    private String saveImage(MultipartFile file) throws IOException {
+        Path uploadPath = Paths.get(uploadDir);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        String newFilename = UUID.randomUUID() + extension;
+
+        Path filePath = uploadPath.resolve(newFilename);
+        Files.copy(file.getInputStream(), filePath);
+
+        return "uploads/" + newFilename;
     }
 }
