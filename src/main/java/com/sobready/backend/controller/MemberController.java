@@ -1,6 +1,8 @@
 package com.sobready.backend.controller;
 
 import com.sobready.backend.entity.Member;
+import com.sobready.backend.enums.MemberStatus;
+import com.sobready.backend.enums.MemberType;
 import com.sobready.backend.service.MemberService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -113,8 +115,12 @@ public class MemberController {
      * @AuthenticationPrincipal = gets the current user from the JWT token
      *   Same as @Req() req → req.user in NestJS
      */
+    /**
+     * POST /user/update
+     * React expects: result.data → Member object directly
+     */
     @PostMapping("/update")
-    public ResponseEntity<Map<String, Object>> updateMember(
+    public ResponseEntity<Member> updateMember(
             @AuthenticationPrincipal Member currentMember,
             @RequestParam(required = false) String memberNick,
             @RequestParam(required = false) String memberPhone,
@@ -125,7 +131,7 @@ public class MemberController {
         Member updated = memberService.updateMember(currentMember, memberNick, memberPhone,
                 memberAddress, memberDesc, memberImage);
 
-        return ResponseEntity.ok(Map.of("member", updated));
+        return ResponseEntity.ok(updated);
     }
 
     /**
@@ -144,5 +150,38 @@ public class MemberController {
     @GetMapping("/manager")
     public ResponseEntity<Member> getManager() {
         return ResponseEntity.ok(memberService.getManager());
+    }
+
+    // ===================== ADMIN ENDPOINTS =====================
+
+    /**
+     * GET /user/all — get all members (ADMIN only)
+     */
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllMembers(@AuthenticationPrincipal Member currentMember) {
+        if (currentMember.getMemberType() != MemberType.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("message", "Admin access required"));
+        }
+        return ResponseEntity.ok(memberService.getAllMembers());
+    }
+
+    /**
+     * POST /user/block — block/unblock a member (ADMIN only)
+     */
+    @PostMapping("/block")
+    public ResponseEntity<?> blockMember(
+            @AuthenticationPrincipal Member currentMember,
+            @RequestBody Map<String, Object> input
+    ) {
+        if (currentMember.getMemberType() != MemberType.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("message", "Admin access required"));
+        }
+
+        Long memberId = Long.parseLong(input.get("memberId").toString());
+        String status = input.get("memberStatus").toString();
+        MemberStatus memberStatus = MemberStatus.valueOf(status);
+
+        Member updated = memberService.updateMemberStatus(memberId, memberStatus);
+        return ResponseEntity.ok(updated);
     }
 }

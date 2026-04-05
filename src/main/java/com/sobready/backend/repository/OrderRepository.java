@@ -17,4 +17,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * Your React calls: GET /order/all?orderStatus=PENDING&page=1&limit=5
      */
     Page<Order> findByMemberIdAndOrderStatus(Long memberId, OrderStatus orderStatus, Pageable pageable);
+
+    /**
+     * Find all orders by status (ADMIN — no member filter).
+     */
+    Page<Order> findByOrderStatus(OrderStatus orderStatus, Pageable pageable);
 }

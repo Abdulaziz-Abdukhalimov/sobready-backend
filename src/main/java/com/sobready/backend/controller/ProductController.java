@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,8 +26,14 @@ public class ProductController {
 
     // ===================== PUBLIC ENDPOINTS =====================
 
+    /**
+     * React's ProductService.getProducts() expects:
+     *   result.data → Product[]  (array directly, not wrapped in an object)
+     *
+     * So we return the list directly, not { list: [...], total: 10 }
+     */
     @GetMapping("/all")
-    public ResponseEntity<Map<String, Object>> getProducts(
+    public ResponseEntity<List<Product>> getProducts(
             @RequestParam(required = false) String order,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "8") int limit,
@@ -41,13 +46,7 @@ public class ProductController {
                 order, page, limit, productType, productFragrance, productGender, search
         );
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("list", productPage.getContent());
-        response.put("total", productPage.getTotalElements());
-        response.put("page", page);
-        response.put("limit", limit);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(productPage.getContent());
     }
 
     /**

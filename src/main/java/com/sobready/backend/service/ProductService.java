@@ -227,7 +227,7 @@ public class ProductService {
         String newFilename = UUID.randomUUID() + extension;
 
         Path filePath = uploadPath.resolve(newFilename);
-        Files.copy(file.getInputStream(), filePath);
+        Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
         return "uploads/" + newFilename;
     }

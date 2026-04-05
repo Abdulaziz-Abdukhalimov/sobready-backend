@@ -57,6 +57,9 @@ public class SecurityConfig {
                         // Static files (product images, etc.)
                         .requestMatchers("/uploads/**").permitAll()
 
+                        // Swagger UI
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+
                         // Everything else requires authentication
                         .anyRequest().authenticated()
                 )

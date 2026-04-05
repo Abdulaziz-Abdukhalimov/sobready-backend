@@ -159,6 +159,23 @@ public class OrderService {
      * This is like a "virtual populate" in Mongoose or
      * "eager loading" in TypeORM: { relations: ["orderItems", "orderItems.product"] }
      */
+    /**
+     * Get all orders across all users (ADMIN).
+     */
+    public List<Order> getAllOrders(OrderStatus orderStatus, int page, int limit) {
+        Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Order> orders;
+
+        if (orderStatus != null) {
+            orders = orderRepository.findByOrderStatus(orderStatus, pageable);
+        } else {
+            orders = orderRepository.findAll(pageable);
+        }
+
+        orders.getContent().forEach(this::populateProductsData);
+        return orders.getContent();
+    }
+
     private void populateProductsData(Order order) {
         List<Product> products = new ArrayList<>();
         for (OrderItem item : order.getOrderItems()) {

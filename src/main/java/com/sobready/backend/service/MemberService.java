@@ -195,6 +195,23 @@ public class MemberService {
     }
 
     /**
+     * Get all members (ADMIN).
+     */
+    public List<Member> getAllMembers() {
+        return memberRepository.findAll();
+    }
+
+    /**
+     * Update member status — block/unblock (ADMIN).
+     */
+    public Member updateMemberStatus(Long memberId, MemberStatus status) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new RuntimeException("Member not found"));
+        member.setMemberStatus(status);
+        return memberRepository.save(member);
+    }
+
+    /**
      * Create JWT token and set it as an HTTP-only cookie.
      *
      * HttpOnly cookie means:
@@ -242,7 +259,7 @@ public class MemberService {
 
         // Save file to disk
         Path filePath = uploadPath.resolve(newFilename);
-        Files.copy(file.getInputStream(), filePath);
+        Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
         // Return relative path (this is what gets stored in DB and sent to React)
         return "uploads/" + newFilename;

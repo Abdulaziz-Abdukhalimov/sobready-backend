@@ -4,6 +4,7 @@ import com.sobready.backend.dto.OrderItemDto;
 import com.sobready.backend.dto.OrderUpdateDto;
 import com.sobready.backend.entity.Member;
 import com.sobready.backend.entity.Order;
+import com.sobready.backend.enums.MemberType;
 import com.sobready.backend.enums.OrderStatus;
 import com.sobready.backend.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,25 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-/**
- * NestJS equivalent:
- *
- *   @Controller('order')
- *   @UseGuards(JwtAuthGuard)       ← all endpoints require auth
- *   export class OrderController {
- *     @Post('create')
- *     async create(@Req() req, @Body() items: OrderItemInput[]) { ... }
- *
- *     @Get('all')
- *     async getMyOrders(@Req() req, @Query() query: OrderInquiry) { ... }
- *   }
- *
- * All order endpoints require authentication (SecurityConfig: anyRequest().authenticated()).
- */
 @RestController
 @RequestMapping("/order")
 public class OrderController {
@@ -40,9 +24,7 @@ public class OrderController {
 
     /**
      * POST /order/create
-     * Body: OrderItemDto[] (array of items from the cart)
-     *
-     * Your React sends the cart items array directly as the request body.
+     * React expects: result.data → Order object directly
      */
     @PostMapping("/create")
     public ResponseEntity<Order> createOrder(
@@ -55,9 +37,10 @@ public class OrderController {
 
     /**
      * GET /order/all?orderStatus=PENDING&page=1&limit=5
+     * React expects: result.data → Order[] array directly
      */
     @GetMapping("/all")
-    public ResponseEntity<Map<String, Object>> getMyOrders(
+    public ResponseEntity<List<Order>> getMyOrders(
             @AuthenticationPrincipal Member currentMember,
             @RequestParam OrderStatus orderStatus,
             @RequestParam(defaultValue = "1") int page,
@@ -67,18 +50,12 @@ public class OrderController {
                 currentMember.getId(), orderStatus, page, limit
         );
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("list", orderPage.getContent());
-        response.put("total", orderPage.getTotalElements());
-        response.put("page", page);
-        response.put("limit", limit);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(orderPage.getContent());
     }
 
     /**
      * POST /order/update
-     * Body: { orderId, orderStatus }
+     * React expects: result.data → Order object directly
      */
     @PostMapping("/update")
     public ResponseEntity<Order> updateOrder(
@@ -87,5 +64,24 @@ public class OrderController {
     ) {
         Order order = orderService.updateOrder(dto);
         return ResponseEntity.ok(order);
+    }
+
+    // ===================== ADMIN ENDPOINTS =====================
+
+    /**
+     * GET /order/admin/all — get all orders across all users (ADMIN only)
+     */
+    @GetMapping("/admin/all")
+    public ResponseEntity<?> getAllOrders(
+            @AuthenticationPrincipal Member currentMember,
+            @RequestParam(required = false) OrderStatus orderStatus,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        if (currentMember.getMemberType() != MemberType.ADMIN) {
+            return ResponseEntity.status(403).body(java.util.Map.of("message", "Admin access required"));
+        }
+
+        return ResponseEntity.ok(orderService.getAllOrders(orderStatus, page, limit));
     }
 }
