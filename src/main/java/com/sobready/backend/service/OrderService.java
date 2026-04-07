@@ -69,14 +69,19 @@ public class OrderService {
             throw new RuntimeException("Order must have at least one item");
         }
 
-        // Calculate totals
-        int orderTotal = 0;
+        // Calculate items subtotal
+        int itemsTotal = 0;
         for (OrderItemDto item : items) {
-            orderTotal += item.getItemPrice() * item.getItemQuantity();
+            itemsTotal += item.getItemPrice() * item.getItemQuantity();
         }
 
-        // Free delivery for orders over $1000 (matches your React frontend logic)
-        int delivery = orderTotal >= 1000 ? 0 : 50;
+        // Free delivery for orders over $1000
+        int delivery = itemsTotal >= 1000 ? 0 : 50;
+
+        // orderTotal includes delivery — frontend shows:
+        //   Subtotal = orderTotal - orderDelivery (items only)
+        //   Total = orderTotal (items + delivery)
+        int orderTotal = itemsTotal + delivery;
 
         // Build order
         Order order = Order.builder()
@@ -112,7 +117,7 @@ public class OrderService {
         }
 
         // Add points to member (1 point per $10 spent)
-        int points = orderTotal / 10;
+        int points = itemsTotal / 10;
         member.setMemberPoints(member.getMemberPoints() + points);
         memberRepository.save(member);
 
